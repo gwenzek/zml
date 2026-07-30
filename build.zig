@@ -53,8 +53,9 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const xla = b.dependency("xla", .{});
 
-    const xla_data_proto = addXlaDataProto(b, target, optimize, protobuf);
+    const xla_data_proto = addXlaDataProto(b, target, optimize, protobuf, xla);
     const upb = b.addModule("upb", .{
         .root_source_file = b.path("upb/upb.zig"),
         .target = target,
@@ -88,6 +89,7 @@ fn addXlaDataProto(
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     protobuf: *std.Build.Dependency,
+    xla: *std.Build.Dependency,
 ) *std.Build.Module {
     const protobuf_src = protobuf.builder.dependency("protobuf", .{});
     const abseil = protobuf.builder.dependency("abseil", .{
@@ -129,8 +131,8 @@ fn addXlaDataProto(
         .protoc = protobuf.artifact("protoc"),
         .protoc_gen_upb = protoc_gen_upb,
         .protoc_gen_upb_minitable = protoc_gen_upb_minitable,
-        .proto_root = b.path("third_party/xla/protos"),
-        .proto_file = b.path("third_party/xla/protos/xla/xla_data.proto"),
+        .proto_root = xla.path(""),
+        .proto_file = xla.path("xla/xla_data.proto"),
     });
 
     const xla_data_upb_mod = b.createModule(.{
