@@ -57,6 +57,8 @@ pub fn build(b: *std.Build) void {
     const rules_zig = b.dependency("rules_zig", .{});
 
     const ffi_c = addFfiCModule(b, target, optimize);
+    const runfiles_root = patchRulesZigRunfiles(b, rules_zig);
+    const runfiles_c = addRunfilesCModule(b, target, optimize);
     const ffi = b.addModule("ffi", .{
         .root_source_file = b.path("ffi/ffi.zig"),
         .target = target,
@@ -75,11 +77,12 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     const runfiles = b.addModule("runfiles", .{
-        .root_source_file = rules_zig.path("zig/runfiles/runfiles.zig"),
+        .root_source_file = runfiles_root.path(b, "runfiles.zig"),
         .target = target,
         .optimize = optimize,
         .imports = &.{
             .{ .name = "bazel_builtin", .module = bazel_builtin },
+            .{ .name = "c", .module = runfiles_c },
         },
     });
     const bazel = b.addModule("bazel", .{
@@ -158,6 +161,74 @@ fn addFfiCModule(
     });
     translate.addIncludePath(b.path("ffi"));
     return translate.addModule("ffi_c");
+}
+
+fn addRunfilesCModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+) *std.Build.Module {
+    const header = b.addWriteFiles().add("runfiles_c.h",
+        \\#include <stdlib.h>
+        \\
+    );
+    const translate = b.addTranslateC(.{
+        .root_source_file = header,
+        .target = target,
+        .optimize = optimize,
+    });
+    return translate.addModule("runfiles_c");
+}
+
+/// Zig 0.17 removed `@cImport`, which the pinned rules_zig runfiles library
+/// still uses. Overlay its Zig sources and route that import through translate-c.
+fn patchRulesZigRunfiles(b: *std.Build, rules_zig: *std.Build.Dependency) std.Build.LazyPath {
+    const discovery_path = rules_zig.builder.root.join(
+        b.allocator,
+        "zig/runfiles/src/discovery.zig",
+    ) catch @panic("out of memory");
+    const discovery_path_string = discovery_path.toString(b.allocator) catch @panic("out of memory");
+    b.dependOnFileContents(b.graph.cwdRelativePath(discovery_path_string));
+    const source = discovery_path.root_dir.handle.readFileAlloc(
+        b.graph.io,
+        discovery_path.sub_path,
+        b.allocator,
+        .limited(1024 * 1024),
+    ) catch |err| std.debug.panic("unable to read rules_zig runfiles discovery: {t}", .{err});
+
+    const c_import =
+        \\    const c = @cImport({
+        \\        @cInclude("stdlib.h");
+        \\    });
+    ;
+    if (std.mem.count(u8, source, c_import) != 1) {
+        @panic("rules_zig runfiles discovery has an unexpected libc import");
+    }
+    const patched_source = std.mem.replaceOwned(
+        u8,
+        b.allocator,
+        source,
+        c_import,
+        "    const c = @import(\"c\");",
+    ) catch @panic("out of memory");
+
+    const patched_runfiles = b.addWriteFiles();
+    for ([_][]const u8{
+        "runfiles.zig",
+        "src/Directory.zig",
+        "src/Manifest.zig",
+        "src/RPath.zig",
+        "src/RepoMapping.zig",
+        "src/Runfiles.zig",
+        "src/testutil.zig",
+    }) |path| {
+        _ = patched_runfiles.addCopyFile(
+            rules_zig.path(b.fmt("zig/runfiles/{s}", .{path})),
+            path,
+        );
+    }
+    _ = patched_runfiles.add("src/discovery.zig", patched_source);
+    return patched_runfiles.getDirectory();
 }
 
 fn addZmlProtoLibrary(
