@@ -45,9 +45,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const run_vfs_example = b.addRunArtifact(vfs_example);
-    if (b.args) |args| {
-        run_vfs_example.addArgs(args);
-    }
+    run_vfs_example.addPassthruArgs();
     const step_vfs_example = b.step("run_vfs_example", "Run VFS example");
     step_vfs_example.dependOn(&run_vfs_example.step);
 

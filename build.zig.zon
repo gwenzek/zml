@@ -16,7 +16,7 @@
         },
     },
     .fingerprint = 0x1d9d1fd7ef823ea5,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0-dev.1509+bb296ab9b",
     .paths = .{
         "bazel",
         "build.zig",
