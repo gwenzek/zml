@@ -30,7 +30,7 @@ pub fn main(init: std.process.Init) !void {
 
     const cmd = it.next() orelse {
         std.debug.print("{s}", .{help});
-        return error.MissingCommand;
+        return;
     };
     const command: Command = std.meta.stringToEnum(Command, cmd) orelse {
         std.debug.print("{s}", .{help});
@@ -87,6 +87,9 @@ pub fn runCmd(io: std.Io, allocator: std.mem.Allocator, stdout: *std.Io.Writer, 
             defer file.close(io);
 
             var reader: std.Io.File.Reader = .initStreaming(file, io, &.{});
+            // The source uses the VFS I/O provider while stdout uses the process
+            // provider, so file-to-file operations cannot share raw handles.
+            reader.mode = .streaming_simple;
 
             const read = try reader.interface.streamRemaining(stdout);
             _ = try stdout.write("\n");
