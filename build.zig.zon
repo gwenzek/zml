@@ -1,12 +1,21 @@
 .{
     .name = .zml_build_zig,
     .version = "0.0.1",
+    .dependencies = .{
+        .protobuf = .{
+            .url = "git+https://github.com/allyourcodebase/protobuf#129e9190ffd3e67ade0eb0abdff3b94c08261dae",
+            .hash = "protobuf-35.1.0-BF8X-S1fAAD-sXN409wws8ZhXWxkJ1TcaAa7vV8EYZ0-",
+        },
+    },
     .fingerprint = 0x1d9d1fd7ef823ea5,
     .minimum_zig_version = "0.16.0",
     .paths = .{
         "build.zig",
         "build.zig.zon",
+        "examples/xla_proto",
         "stdx",
+        "third_party/xla/protos",
+        "upb",
         "vfs",
     },
 }

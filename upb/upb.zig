@@ -141,7 +141,7 @@ pub const Allocator = struct {
             }
         }
         if (ptr) |ptr_| {
-            const ptr_as_slice: []u8 = @as(PointerAlignedSlice, @ptrCast(@alignCast(ptr_)))[0..oldsize];
+            const ptr_as_slice: []align(@alignOf(*anyopaque)) u8 = @as(PointerAlignedSlice, @ptrCast(@alignCast(ptr_)))[0..oldsize];
             if (size == 0) {
                 self.allocator.free(ptr_as_slice);
                 return null;

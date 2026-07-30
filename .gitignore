@@ -11,6 +11,7 @@ bazel-*
 
 # Just in case, Zig caches
 .zig-cache/
+zig-pkg/
 zig-out/
 
 # Models
