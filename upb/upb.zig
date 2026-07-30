@@ -60,18 +60,30 @@ fn ProtoName(comptime UpbType: type) []const u8 {
     return type_name[idx + needle.len ..];
 }
 
+fn MinitableName(comptime name: []const u8, comptime start: usize) ?[]const u8 {
+    if (@hasDecl(c, name ++ "_msg_init")) {
+        return name ++ "_msg_init";
+    }
+
+    comptime var idx = start;
+    inline while (idx < name.len) : (idx += 1) {
+        if (name[idx] == '_') {
+            if (MinitableName(name[0..idx] ++ "_" ++ name[idx..], idx + 2)) |field_name| {
+                return field_name;
+            }
+        }
+    }
+
+    return null;
+}
+
 fn Minitable(comptime UpbType: type) *const c.upb_MiniTable {
     const field_name = comptime blk: {
         const name = ProtoName(UpbType);
-        var it = std.mem.tokenizeScalar(u8, name, '_');
-        while (it.next()) |_| {
-            const new_name = name[0..it.index] ++ "_" ++ name[it.index..] ++ "_msg_init";
-            if (@hasDecl(c, new_name)) {
-                break :blk new_name;
-            }
-        } else {
-            @compileError("Unable to find minitable for type:" ++ @typeName(UpbType));
+        if (MinitableName(name, 0)) |resolved| {
+            break :blk resolved;
         }
+        @compileError("Unable to find minitable for type:" ++ @typeName(UpbType));
     };
     return &@field(c, field_name);
 }
